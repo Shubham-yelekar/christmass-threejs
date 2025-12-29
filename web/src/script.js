@@ -36,10 +36,32 @@ gltfLoader.setDRACOLoader(dracoLoader);
  * Materials
  */
 // Baked material
-const bakedTexture = textureLoader.load("baked-1.jpg");
+const bakedTexture = textureLoader.load("baked-3.jpg");
 const bakedMaterial = new THREE.MeshBasicMaterial({ map: bakedTexture });
 bakedTexture.flipY = false;
 bakedTexture.colorSpace = THREE.SRGBColorSpace;
+
+const lightColors = {
+  starLight: "#ffffe5",
+  tree1Light: "#fdfdce",
+  tree2Light: "#ffffe5",
+  fairyLight: "#def1fc",
+};
+
+// star light material
+const starLightMaterial = new THREE.MeshBasicMaterial({
+  color: lightColors.starLight,
+});
+const tree1LightMaterial = new THREE.MeshBasicMaterial({
+  color: lightColors.tree1Light,
+});
+const tree2LightMaterial = new THREE.MeshBasicMaterial({
+  color: lightColors.tree2Light,
+});
+const fairyLightMaterial = new THREE.MeshBasicMaterial({
+  color: lightColors.fairyLight,
+});
+
 /**
  * Object
  */
@@ -53,12 +75,77 @@ bakedTexture.colorSpace = THREE.SRGBColorSpace;
 /**
  * Model
  */
-gltfLoader.load("christmass-scene-4.glb", (gltf) => {
+
+const room = new THREE.Group();
+
+gltfLoader.load("christmass-scene-3-merged.glb", (gltf) => {
   gltf.scene.traverse((child) => {
-    child.material = bakedMaterial;
+    if (child.isMesh) {
+      child.material = bakedMaterial;
+    }
   });
-  scene.add(gltf.scene);
+  room.add(gltf.scene);
+  room.rotation.y = 0;
+  scene.add(room);
+
+  const starLightMesh = gltf.scene.children.find(
+    (child) => child.name === "star"
+  );
+  const candleLightMesh = gltf.scene.children.find(
+    (child) => child.name === "candle-light"
+  );
+  const fairyLightMesh = gltf.scene.children.find(
+    (child) => child.name === "fairy-lights"
+  );
+  const lamp1LightMesh = gltf.scene.children.find(
+    (child) => child.name === "lamp-light-1"
+  );
+  const lamp2LightMesh = gltf.scene.children.find(
+    (child) => child.name === "lamp-light-2"
+  );
+  const tree1LightMesh = gltf.scene.children.find(
+    (child) => child.name === "tree-1"
+  );
+  const tree2LightMesh = gltf.scene.children.find(
+    (child) => child.name === "tree-2"
+  );
+  starLightMesh.material = starLightMaterial;
+  fairyLightMesh.material = fairyLightMaterial;
+  candleLightMesh.material = starLightMaterial;
+  lamp1LightMesh.material = starLightMaterial;
+  lamp2LightMesh.material = starLightMaterial;
+  tree1LightMesh.material = tree1LightMaterial;
+  tree2LightMesh.material = tree2LightMaterial;
+
+  const fireLightMesh = gltf.scene.children.find(
+    (child) => child.name === "fireplace-fire"
+  );
+  console.log(fireLightMesh);
 });
+
+// Particles
+
+const snowGeometry = new THREE.BufferGeometry();
+const snowCount = 2000;
+const positions = new Float32Array(snowCount * 3);
+const velocities = new Float32Array(snowCount * 3);
+
+for (let i = 0; i < snowCount * 3; i += 3) {
+  positions[i] = (Math.random() - 0.5) * 200;
+  positions[i + 1] = Math.random() * 100;
+  positions[i + 2] = (Math.random() - 0.5) * 200;
+  velocities[i + 1] = -Math.random() * 2 - 0.5;
+}
+snowGeometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+const snowMaterial = new THREE.PointsMaterial({
+  color: 0xffffff,
+  size: 2,
+  transparent: true,
+  opacity: 0.8,
+});
+
+const snow = new THREE.Points(snowGeometry, snowMaterial);
+scene.add(snow);
 
 /**
  * Sizes
@@ -87,39 +174,41 @@ window.addEventListener("resize", () => {
  */
 // Base camera
 const camera = new THREE.PerspectiveCamera(
-  30,
+  25,
   sizes.width / sizes.height,
   0.1,
   100
 );
-camera.position.x = 10;
-camera.position.y = 5;
-camera.position.z = -10;
+camera.position.set(10, 8, -10);
 scene.add(camera);
 
-const cameraGui = {
-  camX: camera.position.x,
-  camY: camera.position.y,
-  camZ: camera.position.z,
-  camAngle: 45,
-};
-gui.add(cameraGui, "camX", 0, 90).onChange(() => {
-  camera.position.x = cameraGui.camX;
-});
-gui.add(cameraGui, "camY", 0, 90).onChange(() => {
-  camera.position.y = cameraGui.camY;
-});
-gui.add(cameraGui, "camZ", 0, 90).onChange(() => {
-  camera.position.z = cameraGui.camZ;
-});
-gui.add(cameraGui, "camAngle", 0, 180).onChange(() => {
-  camera.anngle = cameraGui.camAngle;
-});
+function clampCamera() {
+  camera.position.x = THREE.MathUtils.clamp(camera.position.x, 6, 14);
+  camera.position.y = THREE.MathUtils.clamp(camera.position.y, 5, 10);
+  camera.position.z = THREE.MathUtils.clamp(camera.position.z, -16, -6);
+}
 
 // Controls
 const controls = new OrbitControls(camera, canvas);
 controls.enableDamping = true;
+controls.target.set(0, 1.5, 0);
 
+controls.enablePan = false;
+// Horizontal rotation (left-right)
+controls.minAzimuthAngle = Math.PI / 2;
+controls.maxAzimuthAngle = Math.PI;
+
+// Vertical rotation (no top / no bottom)
+controls.minPolarAngle = Math.PI / 3;
+controls.maxPolarAngle = Math.PI / 2.05;
+
+// Zoom limits
+controls.minDistance = 12;
+controls.maxDistance = 24;
+
+// IMPORTANT
+controls.update();
+clampCamera();
 /**
  * Renderer
  */
