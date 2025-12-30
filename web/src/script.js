@@ -4,6 +4,66 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
 
+const fireFragment = `
+  // fireFragment.glsl
+uniform float uTime;
+varying vec2 vUv;
+
+// Simple 2D noise
+float random(vec2 st) {
+  return fract(sin(dot(st.xy, vec2(12.9898,78.233))) * 43758.5453123);
+}
+
+float noise(vec2 st) {
+  vec2 i = floor(st);
+  vec2 f = fract(st);
+
+  float a = random(i);
+  float b = random(i + vec2(1.0, 0.0));
+  float c = random(i + vec2(0.0, 1.0));
+  float d = random(i + vec2(1.0, 1.0));
+
+  vec2 u = f * f * (3.0 - 2.0 * f);
+
+  return mix(a, b, u.x) +
+         (c - a) * u.y * (1.0 - u.x) +
+         (d - b) * u.x * u.y;
+}
+
+void main() {
+  vec2 uv = vUv;
+
+  // Move noise upward
+  float n = noise(vec2(uv.x * 3.0, uv.y * 5.0 - uTime * 2.0));
+
+  // Shape flame (narrow at top)
+  float flame = smoothstep(0.2, 1.0, uv.y);
+  flame *= smoothstep(1.0, 0.3, abs(uv.x - 0.5) * 2.0);
+
+  float intensity = n * flame;
+
+  vec3 color = mix(
+    vec3(1.0, 0.2, 0.0), // red
+    vec3(1.0, 0.9, 0.3), // yellow
+    intensity
+  );
+
+  gl_FragColor = vec4(color, intensity);
+}
+
+`;
+
+const fireVertex = `
+// fireVertex.glsl
+varying vec2 vUv;
+
+void main() {
+  vUv = uv;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}
+
+`;
+
 /**
  * Base
  */
@@ -75,9 +135,63 @@ const fairyLightMaterial = new THREE.MeshBasicMaterial({
 /**
  * Model
  */
+const fireGeometry = new THREE.PlaneGeometry(0.5, 0.8, 1, 1);
+
+const fireMaterial = new THREE.ShaderMaterial({
+  vertexShader: fireVertex,
+  fragmentShader: fireFragment,
+  transparent: true,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+  uniforms: {
+    uTime: { value: 0 },
+  },
+});
+
+const basicMaterial = new THREE.MeshBasicMaterial({
+  color: "#ff0000",
+});
+
+const fire = new THREE.Mesh(fireGeometry, fireMaterial);
+
+// Position inside fireplace
+fire.position.set(-1.4, 0.9, -0.3);
+fire.rotation.y = 1.5;
+// console.log(fire);
+// const fireFolder = gui.addFolder("🔥 Fire");
+
+// fireFolder.add(fire.position, "x", -5, 5, 0.01);
+// fireFolder.add(fire.position, "y", 0, 5, 0.01);
+// fireFolder.add(fire.position, "z", -5, 5, 0.01);
+
+// fireFolder.add(fire.rotation, "y", -Math.PI, Math.PI, 0.01);
+// fireFolder.add(fire.rotation, "x", -Math.PI / 2, Math.PI / 2, 0.01);
+
+// fireFolder.add(fire.scale, "x", 0.1, 3, 0.01);
+// fireFolder.add(fire.scale, "y", 0.1, 3, 0.01);
+
+// fireFolder.add(fire, "visible");
+
+scene.add(fire);
+let cdMesh = null;
+let vinylneedleMesh = null;
+const vinylTexture = textureLoader.load("/viny-cd.png");
+vinylTexture.colorSpace = THREE.SRGBColorSpace;
+
+const vinylMaterial = new THREE.MeshBasicMaterial({
+  map: vinylTexture,
+});
+
+const lidMaterial = new THREE.MeshBasicMaterial({
+  color: "#565656",
+  transparent: true, // 🔥 required
+  opacity: 0.2, // adjust (0.25–0.5)
+
+  depthWrite: false,
+  side: THREE.DoubleSide, // 🔥 critical for clean transparency
+});
 
 const room = new THREE.Group();
-
 gltfLoader.load("christmass-scene-3-merged.glb", (gltf) => {
   gltf.scene.traverse((child) => {
     if (child.isMesh) {
@@ -109,6 +223,17 @@ gltfLoader.load("christmass-scene-3-merged.glb", (gltf) => {
   const tree2LightMesh = gltf.scene.children.find(
     (child) => child.name === "tree-2"
   );
+
+  cdMesh = gltf.scene.children.find((child) => child.name === "vinyl-cd-m");
+
+  const vinylLidMesh = gltf.scene.children.find(
+    (child) => child.name === "vinyl-lid-m"
+  );
+
+  vinylneedleMesh = gltf.scene.children.find(
+    (child) => child.name === "vinly-needle-m"
+  );
+
   starLightMesh.material = starLightMaterial;
   fairyLightMesh.material = fairyLightMaterial;
   candleLightMesh.material = starLightMaterial;
@@ -116,11 +241,8 @@ gltfLoader.load("christmass-scene-3-merged.glb", (gltf) => {
   lamp2LightMesh.material = starLightMaterial;
   tree1LightMesh.material = tree1LightMaterial;
   tree2LightMesh.material = tree2LightMaterial;
-
-  const fireLightMesh = gltf.scene.children.find(
-    (child) => child.name === "fireplace-fire"
-  );
-  console.log(fireLightMesh);
+  cdMesh.material = vinylMaterial;
+  vinylLidMesh.material = lidMaterial;
 });
 
 // Particles
@@ -223,12 +345,16 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
  * Animate
  */
 const clock = new THREE.Clock();
-
+const vinylSpeed = 0.5;
 const tick = () => {
   const elapsedTime = clock.getElapsedTime();
 
   // Update controls
   controls.update();
+  fireMaterial.uniforms.uTime.value = clock.getElapsedTime() * 2;
+  if (cdMesh) {
+    cdMesh.rotation.y = elapsedTime * vinylSpeed;
+  }
 
   // Render
   renderer.render(scene, camera);
