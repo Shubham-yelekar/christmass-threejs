@@ -109,7 +109,7 @@ bakedTexture.colorSpace = THREE.SRGBColorSpace;
 const bgTexture = textureLoader.load("bg-baked-3.jpg");
 const bgMaterial = new THREE.MeshBasicMaterial({ map: bgTexture });
 bgTexture.flipY = false;
-bgMaterial.colorSpace = THREE.SRGBColorSpace;
+bgTexture.colorSpace = THREE.SRGBColorSpace;
 
 const lightColors = {
   starLight: "#ffffe5",
@@ -373,8 +373,8 @@ controls.minPolarAngle = Math.PI / 3;
 controls.maxPolarAngle = Math.PI / 2.05;
 
 // Zoom limits
-controls.minDistance = 12;
-controls.maxDistance = 20;
+controls.minDistance = 8;
+controls.maxDistance = 15;
 
 // IMPORTANT
 controls.update();
