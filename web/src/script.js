@@ -68,9 +68,9 @@ void main() {
  * Base
  */
 // Debug
-const gui = new GUI({
-  width: 400,
-});
+// const gui = new GUI({
+//   width: 400,
+// });
 
 // Canvas
 const canvas = document.querySelector("canvas.webgl");
@@ -100,6 +100,12 @@ const bakedTexture = textureLoader.load("baked-3.jpg");
 const bakedMaterial = new THREE.MeshBasicMaterial({ map: bakedTexture });
 bakedTexture.flipY = false;
 bakedTexture.colorSpace = THREE.SRGBColorSpace;
+
+const bgTexture = textureLoader.load("baked-bg-2.jpg");
+
+const bgMaterial = new THREE.MeshBasicMaterial({ map: bgTexture });
+bakedTexture.flipY = false;
+bgMaterial.colorSpace = THREE.SRGBColorSpace;
 
 const lightColors = {
   starLight: "#ffffe5",
@@ -192,6 +198,18 @@ const lidMaterial = new THREE.MeshBasicMaterial({
 });
 
 const room = new THREE.Group();
+const bg = new THREE.Group();
+
+// gltfLoader.load("bg.glb", (gltf) => {
+//   gltf.scene.traverse((child) => {
+//     if (child.isMesh) {
+//       // child.material = bgMaterial;
+//     }
+//   });
+
+//   bg.add(gltf.scene);
+//   scene.add(bg);
+// });
 gltfLoader.load("christmass-scene-3-merged.glb", (gltf) => {
   gltf.scene.traverse((child) => {
     if (child.isMesh) {
@@ -246,28 +264,56 @@ gltfLoader.load("christmass-scene-3-merged.glb", (gltf) => {
 });
 
 // Particles
+const snowGroup = new THREE.Group();
+scene.add(snowGroup); // or room.add(snowGroup)
 
+const snowRadius = 8; // width/depth around scene
+const snowHeight = 6; // how tall snow spawns
+const snowCount = 300; // good for performance
 const snowGeometry = new THREE.BufferGeometry();
-const snowCount = 2000;
 const positions = new Float32Array(snowCount * 3);
-const velocities = new Float32Array(snowCount * 3);
+const velocities = new Float32Array(snowCount);
 
-for (let i = 0; i < snowCount * 3; i += 3) {
-  positions[i] = (Math.random() - 0.5) * 200;
-  positions[i + 1] = Math.random() * 100;
-  positions[i + 2] = (Math.random() - 0.5) * 200;
-  velocities[i + 1] = -Math.random() * 2 - 0.5;
+for (let i = 0; i < snowCount; i++) {
+  const i3 = i * 3;
+
+  positions[i3] = (Math.random() - 0.5) * snowRadius * 2;
+  positions[i3 + 1] = Math.random() * snowHeight;
+  positions[i3 + 2] = (Math.random() - 0.5) * snowRadius * 2;
+
+  velocities[i] = Math.random() * 0.001 + 0.01;
 }
 snowGeometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
 const snowMaterial = new THREE.PointsMaterial({
   color: 0xffffff,
-  size: 2,
+  size: 0.1,
   transparent: true,
   opacity: 0.8,
+  depthWrite: false,
 });
 
 const snow = new THREE.Points(snowGeometry, snowMaterial);
-scene.add(snow);
+
+snowGroup.add(snow);
+
+function updateSnow() {
+  const positions = snow.geometry.attributes.position.array;
+
+  for (let i = 0; i < snowCount; i++) {
+    const i3 = i * 3;
+
+    positions[i3 + 1] -= velocities[i];
+
+    // reset snow when it falls below scene
+    if (positions[i3 + 1] < 0) {
+      positions[i3 + 1] = snowHeight;
+      positions[i3 + 0] = (Math.random() - 0.5) * snowRadius * 2;
+      positions[i3 + 2] = (Math.random() - 0.5) * snowRadius * 2;
+    }
+  }
+
+  snow.geometry.attributes.position.needsUpdate = true;
+}
 
 /**
  * Sizes
@@ -355,6 +401,7 @@ const tick = () => {
   if (cdMesh) {
     cdMesh.rotation.y = elapsedTime * vinylSpeed;
   }
+  updateSnow();
 
   // Render
   renderer.render(scene, camera);
