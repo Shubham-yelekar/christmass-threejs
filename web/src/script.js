@@ -64,10 +64,15 @@ void main() {
 
 `;
 
+const loadingScreen = document.getElementById("loading-screen");
+
+const loadingManager = new THREE.LoadingManager(() => {
+  loadingScreen.style.display = "none";
+});
 /**
  * Base
  */
-// Debug
+// Debug;
 // const gui = new GUI({
 //   width: 400,
 // });
@@ -82,29 +87,28 @@ const scene = new THREE.Scene();
  * Loaders
  */
 // Texture loader
-const textureLoader = new THREE.TextureLoader();
+const textureLoader = new THREE.TextureLoader(loadingManager);
 
 // Draco loader
 const dracoLoader = new DRACOLoader();
 dracoLoader.setDecoderPath("draco/");
 
 // GLTF loader
-const gltfLoader = new GLTFLoader();
+const gltfLoader = new GLTFLoader(loadingManager);
 gltfLoader.setDRACOLoader(dracoLoader);
 
 /**
  * Materials
  */
 // Baked material
-const bakedTexture = textureLoader.load("baked-3.jpg");
+const bakedTexture = textureLoader.load("baked-3-99.webp");
 const bakedMaterial = new THREE.MeshBasicMaterial({ map: bakedTexture });
 bakedTexture.flipY = false;
 bakedTexture.colorSpace = THREE.SRGBColorSpace;
 
-const bgTexture = textureLoader.load("baked-bg-2.jpg");
-
+const bgTexture = textureLoader.load("bg-baked-3.jpg");
 const bgMaterial = new THREE.MeshBasicMaterial({ map: bgTexture });
-bakedTexture.flipY = false;
+bgTexture.flipY = false;
 bgMaterial.colorSpace = THREE.SRGBColorSpace;
 
 const lightColors = {
@@ -131,17 +135,11 @@ const fairyLightMaterial = new THREE.MeshBasicMaterial({
 /**
  * Object
  */
-// const cube = new THREE.Mesh(
-//     new THREE.BoxGeometry(1, 1, 1),
-//     new THREE.MeshBasicMaterial()
-// )
-
-// scene.add(cube)
 
 /**
  * Model
  */
-const fireGeometry = new THREE.PlaneGeometry(0.5, 0.8, 1, 1);
+const fireGeometry = new THREE.PlaneGeometry(0.8, 0.8, 1, 1);
 
 const fireMaterial = new THREE.ShaderMaterial({
   vertexShader: fireVertex,
@@ -158,17 +156,21 @@ const basicMaterial = new THREE.MeshBasicMaterial({
   color: "#ff0000",
 });
 
-const fire = new THREE.Mesh(fireGeometry, fireMaterial);
+const fireGroup = new THREE.Group();
+const fire1 = new THREE.Mesh(fireGeometry, fireMaterial);
+const fire2 = new THREE.Mesh(fireGeometry, fireMaterial);
+fire2.rotation.y = Math.PI;
+fireGroup.add(fire1, fire2);
 
 // Position inside fireplace
-fire.position.set(-1.4, 0.9, -0.3);
-fire.rotation.y = 1.5;
+fireGroup.position.set(-1.4, 0.9, -0.3);
+fireGroup.rotation.y = 1.5;
 // console.log(fire);
 // const fireFolder = gui.addFolder("🔥 Fire");
 
-// fireFolder.add(fire.position, "x", -5, 5, 0.01);
-// fireFolder.add(fire.position, "y", 0, 5, 0.01);
-// fireFolder.add(fire.position, "z", -5, 5, 0.01);
+// fireFolder.add(fire2.position, "x", -5, 5, 0.01);
+// fireFolder.add(fire2.position, "y", 0, 5, 0.01);
+// fireFolder.add(fire2.position, "z", -5, 5, 0.01);
 
 // fireFolder.add(fire.rotation, "y", -Math.PI, Math.PI, 0.01);
 // fireFolder.add(fire.rotation, "x", -Math.PI / 2, Math.PI / 2, 0.01);
@@ -178,7 +180,7 @@ fire.rotation.y = 1.5;
 
 // fireFolder.add(fire, "visible");
 
-scene.add(fire);
+scene.add(fireGroup);
 let cdMesh = null;
 let vinylneedleMesh = null;
 const vinylTexture = textureLoader.load("/viny-cd.png");
@@ -200,16 +202,16 @@ const lidMaterial = new THREE.MeshBasicMaterial({
 const room = new THREE.Group();
 const bg = new THREE.Group();
 
-// gltfLoader.load("bg.glb", (gltf) => {
-//   gltf.scene.traverse((child) => {
-//     if (child.isMesh) {
-//       // child.material = bgMaterial;
-//     }
-//   });
+gltfLoader.load("bg.glb", (gltf) => {
+  gltf.scene.traverse((child) => {
+    if (child.isMesh) {
+      child.material = bgMaterial;
+    }
+  });
 
-//   bg.add(gltf.scene);
-//   scene.add(bg);
-// });
+  bg.add(gltf.scene);
+  scene.add(bg);
+});
 gltfLoader.load("christmass-scene-3-merged.glb", (gltf) => {
   gltf.scene.traverse((child) => {
     if (child.isMesh) {
@@ -372,7 +374,7 @@ controls.maxPolarAngle = Math.PI / 2.05;
 
 // Zoom limits
 controls.minDistance = 12;
-controls.maxDistance = 24;
+controls.maxDistance = 20;
 
 // IMPORTANT
 controls.update();
